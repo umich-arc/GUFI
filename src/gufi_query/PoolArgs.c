@@ -62,56 +62,98 @@ OF SUCH DAMAGE.
 
 
 
-#ifndef OUTPUT_BUFFERS_H
-#define OUTPUT_BUFFERS_H
+#include <stdlib.h>
 
-#include <pthread.h>
-#include <stddef.h>
-#include <stdio.h>
+#include "dbutils.h"
+#include "gufi_query/PoolArgs.h"
+#include "utils.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+int PoolArgs_init(PoolArgs_t *pa, struct input *in) {
+    /* if (!pa || !in) { */
+    /*     return -1; */
+    /* } */
 
-/*
-  Users are meant to know the internal structures
-  of OutputBuffer and OutputBuffers, instead of
-  having their implementations encapsulated.
-*/
+    memset(pa, 0, sizeof(*pa));
+    pa->in = in;
+    pa->ta = calloc(in->maxthreads, sizeof(struct ThreadArgs));
+    /* if (!pa->ta) { */
+    /*     return -1; */
+    /* } */
 
-/* Single Buffer */
-/* Should only be used by a single thread at a time */
-struct OutputBuffer {
-    void *buf;
-    size_t capacity;
-    size_t filled;
-    size_t count;     /* GUFI specific; counter for number of rows that were buffered here; these are not reset after flushes */
-};
+    size_t i = 0;
+    for(; i < (size_t) in->maxthreads; i++) {
+        struct ThreadArgs *ta = &(pa->ta[i]);
 
-struct OutputBuffer *OutputBuffer_init(struct OutputBuffer *obuf, const size_t capacity);
+        /* only create per-thread db files when not aggregating and outputting to OUTDB */
+        if (!in->sql.init_agg_len && (in->output == OUTDB)) {
+            SNPRINTF(ta->dbname, MAXPATH, "%s.%zu", in->outname, i);
+        }
+        else {
+            SNPRINTF(ta->dbname, MAXPATH, "file:memory%zu?mode=memory&cache=shared", i);
+        }
 
-/* returns how much was written; should be either 0 or size */
-size_t OutputBuffer_write(struct OutputBuffer *obuf, const void *buf, const size_t size, const int increment_count);
+        ta->outdb = opendb(ta->dbname, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 1, 1, NULL, NULL
+                           #if defined(DEBUG) && defined(PER_THREAD_STATS)
+                           , NULL, NULL
+                           , NULL, NULL
+                           #endif
+            );
 
-/* returns how much was flushed (output from fwrite; no fflush) */
-size_t OutputBuffer_flush(struct OutputBuffer *obuf, FILE *out);
+        if (!ta->outdb) {
+            fprintf(stderr, "Error: Could not open in-memory database file\n");
+            break;
+        }
 
-void OutputBuffer_destroy(struct OutputBuffer *obuf);
+        /* run -I */
+        if (in->sql.init_len) {
+            if (sqlite3_exec(ta->outdb, in->sql.init, NULL, NULL, NULL) != SQLITE_OK) {
+                fprintf(stderr, "Error: Could not run SQL Init \"%s\" on %s\n", in->sql.init, ta->dbname);
+                break;
+            }
+        }
 
-/* Buffers for all threads */
-struct OutputBuffers {
-    pthread_mutex_t *mutex;
-    size_t count;
-    struct OutputBuffer *buffers;
-};
+        ta->outfile = stdout;
 
-struct OutputBuffers *OutputBuffers_init(struct OutputBuffers *obufs, const size_t count, const size_t capacity, pthread_mutex_t *global_mutex);
-size_t OutputBuffers_flush_to_single(struct OutputBuffers *obufs, FILE *out);
-size_t OutputBuffers_flush_to_multiple(struct OutputBuffers *obufs, FILE **out);
-void OutputBuffers_destroy(struct OutputBuffers *obufs);
+        /* write to per-thread files during walk - aggregation is handled outside */
+        if (in->output == OUTFILE) {
+            if (!in->sql.init_agg_len) {
+                char outname[MAXPATH];
+                SNPRINTF(outname, MAXPATH, "%s.%zu", in->outname, i);
+                ta->outfile = fopen(outname, "w");
+                if (!ta->outfile) {
+                    fprintf(stderr, "Error: Could not open output file");
+                    break;
+                }
+            }
+        }
 
-#ifdef __cplusplus
+        if (!OutputBuffer_init(&ta->output_buffer, in->output_buffer_size)) {
+            break;
+        }
+    }
+
+    if (i != (size_t) in->maxthreads) {
+        PoolArgs_fin(pa, i + 1);
+        return 1;
+    }
+
+    return 0;
 }
-#endif
 
-#endif
+void PoolArgs_fin(PoolArgs_t *pa, const size_t allocated) {
+    for(size_t i = 0; i < allocated; i++) {
+        struct ThreadArgs *ta = &(pa->ta[i]);
+
+        compiled_stmt_fin(&ta->csc);
+        closedb(ta->outdb);
+
+        OutputBuffer_flush(&ta->output_buffer, ta->outfile);
+        OutputBuffer_destroy(&ta->output_buffer);
+
+        if (pa->in->output == OUTFILE) {
+            fclose(ta->outfile);
+        }
+    }
+
+    free(pa->ta);
+}

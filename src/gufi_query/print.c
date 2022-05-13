@@ -62,56 +62,108 @@ OF SUCH DAMAGE.
 
 
 
-#ifndef OUTPUT_BUFFERS_H
-#define OUTPUT_BUFFERS_H
+#include <stdlib.h>
+#include <string.h>
 
-#include <pthread.h>
-#include <stddef.h>
-#include <stdio.h>
+#include "gufi_query/print.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+int print_parallel(sqlite3_stmt *stmt, void *args) {
+    /* if (!stmt || !ca) { */
+    /*     return 1; */
+    /* } */
 
-/*
-  Users are meant to know the internal structures
-  of OutputBuffer and OutputBuffers, instead of
-  having their implementations encapsulated.
-*/
+    PrintArgs_t *print = (PrintArgs_t *) args;
+    struct OutputBuffer *ob = print->output_buffer;
 
-/* Single Buffer */
-/* Should only be used by a single thread at a time */
-struct OutputBuffer {
-    void *buf;
-    size_t capacity;
-    size_t filled;
-    size_t count;     /* GUFI specific; counter for number of rows that were buffered here; these are not reset after flushes */
-};
+    const int count = sqlite3_data_count(stmt);
+    if (!count) {
+        return 0;
+    }
 
-struct OutputBuffer *OutputBuffer_init(struct OutputBuffer *obuf, const size_t capacity);
+    char **data = malloc(count * sizeof(char *));
+    size_t *lens = malloc(count * sizeof(size_t));
+    size_t row_len = count + 1; /* one delimiter per column + newline */
+    for(int i = 0; i < count; i++) {
+        data[i] = (char *) sqlite3_column_text(stmt, i);
+        lens[i] = 0;
+        if (data[i]) {
+            lens[i] = strlen(data[i]);
+            row_len += lens[i];
+        }
+    }
 
-/* returns how much was written; should be either 0 or size */
-size_t OutputBuffer_write(struct OutputBuffer *obuf, const void *buf, const size_t size, const int increment_count);
+    /* if a row cannot fit the buffer for whatever reason, flush the existing bufffer */
+    if ((ob->capacity - ob->filled) < row_len) {
+        if (print->mutex) {
+            pthread_mutex_lock(print->mutex);
+        }
+        OutputBuffer_flush(ob, print->outfile);
+        if (print->mutex) {
+            pthread_mutex_unlock(print->mutex);
+        }
+    }
 
-/* returns how much was flushed (output from fwrite; no fflush) */
-size_t OutputBuffer_flush(struct OutputBuffer *obuf, FILE *out);
+    /* if the row is larger than the entire buffer, flush this row */
+    if (ob->capacity < row_len) {
+        /* the existing buffer will have been flushed a few lines ago, maintaining output order */
+        if (print->mutex) {
+            pthread_mutex_lock(print->mutex);
+        }
+        for(int i = 0; i < count; i++) {
+            if (data[i]) {
+                fwrite(data[i], sizeof(char), lens[i], print->outfile);
+            }
+            fwrite(&print->delim, sizeof(char), 1, print->outfile);
+        }
+        fwrite("\n", sizeof(char), 1, print->outfile);
+        ob->count++;
+        if (print->mutex) {
+            pthread_mutex_unlock(print->mutex);
+        }
+    }
+    /* otherwise, the row can fit into the buffer, so buffer it */
+    /* if the old data + this row cannot fit the buffer, works since old data has been flushed */
+    /* if the old data + this row fit the buffer, old data was not flushed, but no issue */
+    else {
+        char *buf = ob->buf;
+        size_t filled = ob->filled;
+        for(int i = 0; i < count; i++) {
+            if (data[i]) {
+                memcpy(&buf[filled], data[i], lens[i]);
+                filled += lens[i];
+            }
 
-void OutputBuffer_destroy(struct OutputBuffer *obuf);
+            buf[filled] = print->delim;
+            filled++;
+        }
 
-/* Buffers for all threads */
-struct OutputBuffers {
-    pthread_mutex_t *mutex;
-    size_t count;
-    struct OutputBuffer *buffers;
-};
+        buf[filled] = '\n';
+        filled++;
 
-struct OutputBuffers *OutputBuffers_init(struct OutputBuffers *obufs, const size_t count, const size_t capacity, pthread_mutex_t *global_mutex);
-size_t OutputBuffers_flush_to_single(struct OutputBuffers *obufs, FILE *out);
-size_t OutputBuffers_flush_to_multiple(struct OutputBuffers *obufs, FILE **out);
-void OutputBuffers_destroy(struct OutputBuffers *obufs);
+        ob->filled = filled;
+        ob->count++;
+    }
 
-#ifdef __cplusplus
+    free(lens);
+    free(data);
+
+    print->rows++;
+
+    return 0;
 }
-#endif
 
-#endif
+int print_serial(void *args, int count, char **data, char **columns) {
+    (void) columns;
+
+    PrintArgs_t *print = (struct PrintArgs *) args;
+    for(int i = 0; i < count; i++) {
+        if (data[i]) {
+            fwrite(data[i], sizeof(char), strlen(data[i]), print->outfile);
+        }
+        fwrite(&print->delim, sizeof(char), 1, print->outfile);
+    }
+    fwrite("\n", sizeof(char), 1, print->outfile);
+    print->rows++;
+
+    return 0;
+}

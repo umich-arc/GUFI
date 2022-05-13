@@ -62,56 +62,21 @@ OF SUCH DAMAGE.
 
 
 
-#ifndef OUTPUT_BUFFERS_H
-#define OUTPUT_BUFFERS_H
+#include "gufi_query/CompiledStmtCache.h"
 
-#include <pthread.h>
-#include <stddef.h>
-#include <stdio.h>
+void compiled_stmt_fin(CSC_t *csc) {
+    sqlite3_finalize(csc->intermediate);
+    sqlite3_finalize(csc->ent);
+    sqlite3_finalize(csc->sum);
+    sqlite3_finalize(csc->rollupscore);
+    sqlite3_finalize(csc->tsum);
+    sqlite3_finalize(csc->tsum_exists);
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+    sqlite3_finalize(csc->xattrs.drop_xattrs);
+    sqlite3_finalize(csc->xattrs.create_xsummary);
+    sqlite3_finalize(csc->xattrs.create_xpentries);
+    sqlite3_finalize(csc->xattrs.create_xentries);
+    sqlite3_finalize(csc->xattrs.db_list);
 
-/*
-  Users are meant to know the internal structures
-  of OutputBuffer and OutputBuffers, instead of
-  having their implementations encapsulated.
-*/
-
-/* Single Buffer */
-/* Should only be used by a single thread at a time */
-struct OutputBuffer {
-    void *buf;
-    size_t capacity;
-    size_t filled;
-    size_t count;     /* GUFI specific; counter for number of rows that were buffered here; these are not reset after flushes */
-};
-
-struct OutputBuffer *OutputBuffer_init(struct OutputBuffer *obuf, const size_t capacity);
-
-/* returns how much was written; should be either 0 or size */
-size_t OutputBuffer_write(struct OutputBuffer *obuf, const void *buf, const size_t size, const int increment_count);
-
-/* returns how much was flushed (output from fwrite; no fflush) */
-size_t OutputBuffer_flush(struct OutputBuffer *obuf, FILE *out);
-
-void OutputBuffer_destroy(struct OutputBuffer *obuf);
-
-/* Buffers for all threads */
-struct OutputBuffers {
-    pthread_mutex_t *mutex;
-    size_t count;
-    struct OutputBuffer *buffers;
-};
-
-struct OutputBuffers *OutputBuffers_init(struct OutputBuffers *obufs, const size_t count, const size_t capacity, pthread_mutex_t *global_mutex);
-size_t OutputBuffers_flush_to_single(struct OutputBuffers *obufs, FILE *out);
-size_t OutputBuffers_flush_to_multiple(struct OutputBuffers *obufs, FILE **out);
-void OutputBuffers_destroy(struct OutputBuffers *obufs);
-
-#ifdef __cplusplus
+    memset(csc, 0, sizeof(*csc));
 }
-#endif
-
-#endif

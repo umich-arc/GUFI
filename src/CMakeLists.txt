@@ -110,14 +110,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   endif()
 endif()
 
-# opendb can be turned off
-# addqueryfuncs fails silently if not turned off
-# sqlite3_exec fails with error message if not turned off
-option(OPENDB "Whether or not to enable opening databases" ON)
-if (OPENDB)
-  add_definitions(-DOPENDB=1)
-endif()
-
 # addqueryfuncs can be turned off
 option(ADDQUERYFUNCS "Add custom functions to opened databases" ON)
 if (ADDQUERYFUNCS)
@@ -145,7 +137,8 @@ set(GUFI_SOURCES
   template_db.c
   trace.c
   utils.c
-  xattrs.c)
+  xattrs.c
+)
 add_library(GUFI STATIC ${GUFI_SOURCES})
 add_dependencies(GUFI install_dependencies)
 
@@ -170,13 +163,9 @@ endif()
 #        -> compiles file2.cpp into file2
 #        -> installs file1 and file2 into bin
 #
-function(build_and_install PATH LINK_GUFI)
-  foreach(SOURCE ${ARGN})
-    # get the filename only (no path or extension)
-    string(REGEX REPLACE "\\.[^.]*$" "" TARGET ${SOURCE})
-
+function(build_and_install_one PATH LINK_GUFI TARGET)
     # create the target for building the executable
-    add_executable(${TARGET} ${SOURCE})
+    add_executable(${TARGET} ${ARGN})
 
     # link GUFI libraries if needed
     if (LINK_GUFI)
@@ -186,6 +175,13 @@ function(build_and_install PATH LINK_GUFI)
 
     # install the executable
     install(TARGETS ${TARGET} DESTINATION ${PATH} COMPONENT Server)
+endfunction()
+
+function(build_and_install PATH LINK_GUFI)
+  foreach(SOURCE ${ARGN})
+    # get the filename only (no path or extension)
+    string(REGEX REPLACE "\\.[^.]*$" "" TARGET ${SOURCE})
+    build_and_install_one("${PATH}" "${LINK_GUFI}" "${TARGET}" "${SOURCE}")
   endforeach()
 endfunction()
 
@@ -197,7 +193,6 @@ set(C_SOURCES
   gufi_dir2index.c
   gufi_dir2trace.c
   gufi_trace2index.c
-  gufi_query.c
   gufi_stat.c
   parallel_rmr.c
   querydbs.c
@@ -207,6 +202,16 @@ set(C_SOURCES
 
 # build the C executables
 build_and_install(${BIN} TRUE ${C_SOURCES})
+
+# gufi_query has extra sources
+build_and_install_one(${BIN} TRUE gufi_query
+  gufi_query/CompiledStmtCache.c
+  gufi_query/PoolArgs.c
+  gufi_query/aggregate.c
+  gufi_query/main.c
+  gufi_query/print.c
+  gufi_query/rollup.c
+)
 
 # build binaries that do not need to link with GUFI
 set(MISC_SOURCES tsmtime2epoch.c tsmepoch2time.c)

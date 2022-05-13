@@ -62,56 +62,41 @@ OF SUCH DAMAGE.
 
 
 
-#ifndef OUTPUT_BUFFERS_H
-#define OUTPUT_BUFFERS_H
+#ifndef GUFI_QUERY_POOL_ARGS_H
+#define GUFI_QUERY_POOL_ARGS_H
 
 #include <pthread.h>
 #include <stddef.h>
-#include <stdio.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "OutputBuffers.h"
+#include "bf.h"
+#include "debug.h"
+#include "gufi_query/CompiledStmtCache.h"
 
-/*
-  Users are meant to know the internal structures
-  of OutputBuffer and OutputBuffers, instead of
-  having their implementations encapsulated.
-*/
+struct ThreadArgs {
+    char dbname[MAXPATH];
+    sqlite3 *outdb;                    /* either user named or in-memory */
+    CSC_t csc;                         /* compiled statement cache point to db */
+    FILE *outfile;                     /* always points to STDOUT or a user defined file */
+    struct OutputBuffer output_buffer; /* only used when outputting to STDOUT or OUTFILE */
 
-/* Single Buffer */
-/* Should only be used by a single thread at a time */
-struct OutputBuffer {
-    void *buf;
-    size_t capacity;
-    size_t filled;
-    size_t count;     /* GUFI specific; counter for number of rows that were buffered here; these are not reset after flushes */
+    #if defined(DEBUG) && defined(CUMULATIVE_TIMES)
+    size_t queries;                    /* query count, not including -T, -S, and -E */
+    #endif
 };
 
-struct OutputBuffer *OutputBuffer_init(struct OutputBuffer *obuf, const size_t capacity);
+typedef struct PoolArgs {
+    struct input *in;                  /* save a reference here for convenience */
+    struct ThreadArgs *ta;
 
-/* returns how much was written; should be either 0 or size */
-size_t OutputBuffer_write(struct OutputBuffer *obuf, const void *buf, const size_t size, const int increment_count);
+    pthread_mutex_t *stdout_mutex;
 
-/* returns how much was flushed (output from fwrite; no fflush) */
-size_t OutputBuffer_flush(struct OutputBuffer *obuf, FILE *out);
+    #ifdef DEBUG
+    struct timespec *start_time;
+    #endif
+} PoolArgs_t;
 
-void OutputBuffer_destroy(struct OutputBuffer *obuf);
-
-/* Buffers for all threads */
-struct OutputBuffers {
-    pthread_mutex_t *mutex;
-    size_t count;
-    struct OutputBuffer *buffers;
-};
-
-struct OutputBuffers *OutputBuffers_init(struct OutputBuffers *obufs, const size_t count, const size_t capacity, pthread_mutex_t *global_mutex);
-size_t OutputBuffers_flush_to_single(struct OutputBuffers *obufs, FILE *out);
-size_t OutputBuffers_flush_to_multiple(struct OutputBuffers *obufs, FILE **out);
-void OutputBuffers_destroy(struct OutputBuffers *obufs);
-
-#ifdef __cplusplus
-}
-#endif
+int PoolArgs_init(PoolArgs_t *pa, struct input *in);
+void PoolArgs_fin(PoolArgs_t *pa, const size_t allocated);
 
 #endif

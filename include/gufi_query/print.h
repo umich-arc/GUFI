@@ -62,56 +62,27 @@ OF SUCH DAMAGE.
 
 
 
-#ifndef OUTPUT_BUFFERS_H
-#define OUTPUT_BUFFERS_H
+#ifndef GUFI_QUERY_PRINT_H
+#define GUFI_QUERY_PRINT_H
 
 #include <pthread.h>
+#include <sqlite3.h>
 #include <stddef.h>
 #include <stdio.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "OutputBuffers.h"
 
-/*
-  Users are meant to know the internal structures
-  of OutputBuffer and OutputBuffers, instead of
-  having their implementations encapsulated.
-*/
+/* sqlite3_exec callback argument data */
+typedef struct PrintArgs {
+    struct OutputBuffer *output_buffer;   /* buffer for printing into before writing to file */
+    char delim;
+    pthread_mutex_t *mutex;               /* mutex for printing to stdout */
+    FILE *outfile;
+    size_t rows;                          /* number of rows returned by the query */
+    /* size_t printed;                    /\* number of records printed by the callback *\/ */
+} PrintArgs_t;
 
-/* Single Buffer */
-/* Should only be used by a single thread at a time */
-struct OutputBuffer {
-    void *buf;
-    size_t capacity;
-    size_t filled;
-    size_t count;     /* GUFI specific; counter for number of rows that were buffered here; these are not reset after flushes */
-};
-
-struct OutputBuffer *OutputBuffer_init(struct OutputBuffer *obuf, const size_t capacity);
-
-/* returns how much was written; should be either 0 or size */
-size_t OutputBuffer_write(struct OutputBuffer *obuf, const void *buf, const size_t size, const int increment_count);
-
-/* returns how much was flushed (output from fwrite; no fflush) */
-size_t OutputBuffer_flush(struct OutputBuffer *obuf, FILE *out);
-
-void OutputBuffer_destroy(struct OutputBuffer *obuf);
-
-/* Buffers for all threads */
-struct OutputBuffers {
-    pthread_mutex_t *mutex;
-    size_t count;
-    struct OutputBuffer *buffers;
-};
-
-struct OutputBuffers *OutputBuffers_init(struct OutputBuffers *obufs, const size_t count, const size_t capacity, pthread_mutex_t *global_mutex);
-size_t OutputBuffers_flush_to_single(struct OutputBuffers *obufs, FILE *out);
-size_t OutputBuffers_flush_to_multiple(struct OutputBuffers *obufs, FILE **out);
-void OutputBuffers_destroy(struct OutputBuffers *obufs);
-
-#ifdef __cplusplus
-}
-#endif
+int print_parallel(sqlite3_stmt *stmt, void *args);
+int print_serial(void *args, int count, char **data, char **columns);
 
 #endif

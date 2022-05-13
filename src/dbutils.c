@@ -61,15 +61,15 @@ OF SUCH DAMAGE.
 */
 
 
+
 #include <errno.h>
+#include <grp.h>
 #include <libgen.h>
+#include <pcre.h>
+#include <pwd.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <pwd.h>
-#include <grp.h>
-#include "pcre.h"
 
 #include "config.h"
 #include "dbutils.h"
@@ -152,26 +152,31 @@ sqlite3 *attachdb(const char *name, sqlite3 *db, const char *dbn, const int flag
       }
   }
 
-  if (sqlite3_exec(db, attach, NULL, NULL, NULL) != SQLITE_OK) {
+  char *err = NULL;
+  if (sqlite3_exec(db, attach, NULL, NULL, &err) != SQLITE_OK) {
       if (print_err) {
-          fprintf(stderr, "Cannot attach database as \"%s\": %s\n", dbn, sqlite3_errmsg(db));
+          fprintf(stderr, "Cannot attach database as \"%s\": %s: %s\n", dbn, attach, err);
+      }
+  }
+  sqlite3_free(err);
+
+  return err?NULL:db;
+}
+
+sqlite3 *detachdb(const char *name, sqlite3 *db, const char *dbn, const int print_err)
+{
+  char detach[MAXSQL];
+  if (!sqlite3_snprintf(MAXSQL, detach, "DETACH %Q", dbn)) {
+      if (print_err) {
+          fprintf(stderr, "Cannot create DETACH command\n");
       }
       return NULL;
   }
 
-  return db;
-}
-
-sqlite3 *detachdb(const char *name, sqlite3 *db, const char *dbn)
-{
-  char detach[MAXSQL];
-  if (!sqlite3_snprintf(MAXSQL, detach, "DETACH %Q", dbn)) {
-      fprintf(stderr, "Cannot create DETACH command\n");
-      return NULL;
-  }
-
   if (sqlite3_exec(db, detach, NULL, NULL, NULL) != SQLITE_OK) {
-      fprintf(stderr, "Cannot detach database: %s %s\n", name, sqlite3_errmsg(db));
+      if (print_err) {
+          fprintf(stderr, "Cannot detach database: %s %s\n", dbn, sqlite3_errmsg(db));
+      }
       return NULL;
   }
 
@@ -1204,22 +1209,56 @@ size_t print_results(sqlite3_stmt *res, FILE *out, const int printpath, const in
     return rec_count;
 }
 
-static int get_rollupscore_callback(void *args, int count, char **data, char **columns) {
-    int *rollupscore = (int *) args;
-    *rollupscore = atoi(data[0]);
-    return 0;
-}
+int compiled_stmt_cache_run(sqlite3 *db,
+                            const char *sql, sqlite3_stmt **stmt,
+                            int (*callback)(sqlite3_stmt *stmt, void *args),
+                            void *args, size_t *rows) {
+    /* if (!db || !sql || || !stmt) { */
+    /*     return -11; */
+    /* } */
 
-int get_rollupscore(const char *name, sqlite3 *db, int *rollupscore) {
-    char *err = NULL;
-    if (sqlite3_exec(db, "SELECT rollupscore FROM summary WHERE isroot == 1",
-                     get_rollupscore_callback, rollupscore, &err) != SQLITE_OK) {
-        sqlite3_free(err);
-        return -1;
+    #if SQL_EXEC
+    /* compile query if it has not already been compiled */
+    if (!*stmt) {
+        *stmt = insertdbprep(db, sql);
+
+        if (!*stmt) {
+            fprintf(stderr, "Error: Could not prepare SQL statement \"%s\": %s\n", sql, sqlite3_errmsg(db));
+            return -1;
+        }
     }
 
-    return 0;
+    sqlite3_reset(*stmt);
+
+    /* run query */
+    int rc = SQLITE_DONE;
+    size_t count = 0;
+
+    /* reduce branch predictions */
+    if (callback) {
+        while ((rc = sqlite3_step(*stmt)) == SQLITE_ROW) {
+            count += (callback(*stmt, args) == 0);
+        }
+    }
+    else {
+        while ((rc = sqlite3_step(*stmt)) == SQLITE_ROW) {
+            count++;
+        }
+    }
+
+    if (rc == SQLITE_DONE) {
+        if (rows) {
+            *rows = count;
+        }
+    }
+    else {
+        fprintf(stderr, "Error: Could not run \"%s\": %s (%d)\n", sql, sqlite3_errmsg(db), rc);
+    }
+    #endif
+
+    return (rc != SQLITE_DONE);
 }
+
 
 struct xattr_db *create_xattr_db(struct template_db *tdb,
                                  const char *path, const size_t path_len,
@@ -1320,6 +1359,8 @@ void destroy_xattr_db(void *ptr) {
     free(xdb);
 }
 
+static const char XATTR_GET_DB_LIST[] = "SELECT filename, attachname FROM " XATTR_FILES;
+
 /*
  * Attach the files listed in the xattr_files table to db.db and
  * create the xattrs view of all xattrs accessible by the caller.
@@ -1328,9 +1369,9 @@ void destroy_xattr_db(void *ptr) {
  * a LEFT JOIN with the xattrs view. These views contain all rows,
  * whether or not they have xattrs.
  */
-int xattrprep(const char *path, const size_t path_len, sqlite3 *db
+int xattrprep(const char *path, const size_t path_len, sqlite3 *db, struct XAttrCache *xcache
               #if defined(DEBUG) && defined(CUMULATIVE_TIMES)
-              ,size_t *query_count
+              , size_t *query_count
               #endif
     )
 {
@@ -1338,28 +1379,31 @@ int xattrprep(const char *path, const size_t path_len, sqlite3 *db
     static const size_t XATTR_COLS_LEN = sizeof(XATTR_COLS) - 1;
     static const size_t XATTRS_AVAIL_LEN = sizeof(XATTRS_AVAIL) - 1;
 
-    int           rec_count = 0;
-    sqlite3_stmt *res = NULL;
-    char          unioncmd[MAXSQL] = "CREATE TEMP VIEW IF NOT EXISTS " XATTRS " AS";
-    char         *unioncmdp = unioncmd + strlen(unioncmd);
+    int   rec_count = 0;
+    char  unioncmd[MAXSQL] = "CREATE TEMP VIEW IF NOT EXISTS " XATTRS " AS";
+    char *unioncmdp = unioncmd + strlen(unioncmd);
 
-    /* step through each xattr db file */
-    int error = sqlite3_prepare_v2(db, "SELECT filename, attachname FROM " XATTR_FILES, MAXSQL, &res, NULL);
-    if (error != SQLITE_OK) {
-        fprintf(stderr, "xattrprep Error: %s: Could not get filenames from table %s: %d err %s\n",
-               path, XATTR_FILES, error, sqlite3_errmsg(db));
-        return -1;
+    if (!xcache->db_list) {
+        int error = sqlite3_prepare_v2(db, XATTR_GET_DB_LIST, MAXSQL, &xcache->db_list, NULL);
+        if (error != SQLITE_OK) {
+            fprintf(stderr, "xattrprep Error: %s: Could not get filenames from table %s: %d err %s\n",
+                    path, XATTR_FILES, error, sqlite3_errmsg(db));
+            return -1;
+        }
     }
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
-        /* const int ncols = sqlite3_column_count(res); */
+    sqlite3_reset(xcache->db_list);
+
+    /* step through each xattr db file */
+    while (sqlite3_step(xcache->db_list) == SQLITE_ROW) {
+        /* const int ncols = sqlite3_column_count(xcache->db_list); */
         /* if (ncols != 2) { */
         /*     fprintf(stderr, "Error: Searching xattr file list returned bad column count: %d (expected 2)\n", ncols); */
         /*     continue; */
         /* } */
 
-        const char *filename   = (const char *) sqlite3_column_text(res, 0);
-        const char *attachname = (const char *) sqlite3_column_text(res, 1);
+        const char *filename   = (const char *) sqlite3_column_text(xcache->db_list, 0);
+        const char *attachname = (const char *) sqlite3_column_text(xcache->db_list, 1);
         const size_t attachname_len = strlen(attachname);
 
         /* ATTACH <path>/<per-user/group db> AS <attach name> */
@@ -1388,7 +1432,6 @@ int xattrprep(const char *path, const size_t path_len, sqlite3 *db
         (*query_count)++;
         #endif
     }
-    sqlite3_finalize(res);
 
     SNFORMAT_S(unioncmdp, sizeof(unioncmd) - (unioncmdp - unioncmd), 2,
                XATTR_COLS, XATTR_COLS_LEN,
@@ -1408,38 +1451,69 @@ int xattrprep(const char *path, const size_t path_len, sqlite3 *db
 
     /* create LEFT JOIN views (all rows, with and without xattrs) */
 
-    rc = sqlite3_exec(db, "CREATE TEMP VIEW IF NOT EXISTS xentries AS SELECT " ENTRIES ".*, " XATTRS ".name as xattr_name, " XATTRS ".value as xattr_value FROM " ENTRIES " LEFT JOIN " XATTRS " ON " ENTRIES ".inode == " XATTRS ".inode", 0, 0, NULL);
+    rc = compiled_stmt_cache_run(db, "CREATE TEMP VIEW IF NOT EXISTS xentries AS SELECT " ENTRIES ".*, " XATTRS ".name as xattr_name, " XATTRS ".value as xattr_value FROM " ENTRIES " LEFT JOIN " XATTRS " ON " ENTRIES ".inode == " XATTRS ".inode", &xcache->create_xentries, NULL, NULL, NULL);
 
     #if defined(DEBUG) && defined(CUMULATIVE_TIMES)
     (*query_count)++;
     #endif
 
-    if (rc != SQLITE_OK) {
+    if (rc) {
         fprintf(stderr, "Error: Create xentries view failed: %s\n", sqlite3_errmsg(db));
         return -1;
     }
 
-    rc = sqlite3_exec(db, "CREATE TEMP VIEW IF NOT EXISTS xpentries AS SELECT " PENTRIES ".*, " XATTRS ".name as xattr_name, " XATTRS ".value as xattr_value FROM " PENTRIES " LEFT JOIN xattrs ON " PENTRIES ".inode == " XATTRS ".inode", 0, 0, NULL);
+    rc = compiled_stmt_cache_run(db, "CREATE TEMP VIEW IF NOT EXISTS xpentries AS SELECT " PENTRIES ".*, " XATTRS ".name as xattr_name, " XATTRS ".value as xattr_value FROM " PENTRIES " LEFT JOIN xattrs ON " PENTRIES ".inode == " XATTRS ".inode", &xcache->create_xpentries, NULL, NULL, NULL);
 
     #if defined(DEBUG) && defined(CUMULATIVE_TIMES)
     (*query_count)++;
     #endif
 
-    if (rc != SQLITE_OK) {
+    if (rc) {
         fprintf(stderr, "Error: Create xpentries view failed: %s\n", sqlite3_errmsg(db));
         return -1;
     }
 
-    rc = sqlite3_exec(db, "CREATE TEMP VIEW IF NOT EXISTS xsummary AS SELECT " SUMMARY ".*, " XATTRS ".name as xattr_name, " XATTRS ".value as xattr_value FROM " SUMMARY " LEFT JOIN xattrs ON " SUMMARY ".inode == " XATTRS ".inode", 0, 0, NULL);
+    rc = compiled_stmt_cache_run(db, "CREATE TEMP VIEW IF NOT EXISTS xsummary AS SELECT " SUMMARY ".*, " XATTRS ".name as xattr_name, " XATTRS ".value as xattr_value FROM " SUMMARY " LEFT JOIN xattrs ON " SUMMARY ".inode == " XATTRS ".inode", &xcache->create_xsummary, NULL, NULL, NULL);
 
     #if defined(DEBUG) && defined(CUMULATIVE_TIMES)
     (*query_count)++;
     #endif
 
-    if (rc != SQLITE_OK) {
+    if (rc) {
         fprintf(stderr, "Error: create xsummary view failed: %s\n", sqlite3_errmsg(db));
         return -1;
     }
 
     return rec_count;
+}
+
+static int detach_xattr_db(sqlite3_stmt *stmt, void *args) {
+    /* const int ncols = sqlite3_column_count(res); */
+    /* if (ncols != 2) { */
+    /*     fprintf(stderr, "Error: Searching xattr file list returned bad column count: %d (expected 2)\n", ncols); */
+    /*     continue; */
+    /* } */
+
+    const char *attachname = (const char *) sqlite3_column_text(stmt, 1);
+    detachdb(NULL, (sqlite3 *) args, attachname, 0); /* don't check for errors */
+    return 0;
+}
+
+void xattrdone(sqlite3 *db, struct XAttrCache *xcache
+               #if defined(DEBUG) && defined(CUMULATIVE_TIMES)
+               , size_t *query_count
+               #endif
+    )
+{
+    compiled_stmt_cache_run(db, "DROP VIEW xattrs;", &xcache->drop_xattrs, NULL, NULL, NULL);
+
+    #if defined(DEBUG) && defined(CUMULATIVE_TIMES)
+    (*query_count)++;
+    #endif
+
+    compiled_stmt_cache_run(db, XATTR_GET_DB_LIST, &xcache->db_list, detach_xattr_db, db, NULL);
+
+    #if defined(DEBUG) && defined(CUMULATIVE_TIMES)
+    (*query_count)++;
+    #endif
 }

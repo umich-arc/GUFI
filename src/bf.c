@@ -100,53 +100,54 @@ void print_help(const char* prog_name,
    while ((ch = *opt++)) {
       switch (ch) {
       case ':': continue;
-      case 'h': printf("  -h                     help\n"); break;
-      case 'H': printf("  -H                     show assigned input values (debugging)\n"); break;
-      case 'x': printf("  -x                     enable xattr processing\n"); break;
-      case 'p': printf("  -p                     print file-names\n"); break;
-      case 'P': printf("  -P                     print directories as they are encountered\n"); break;
-      case 'N': printf("  -N                     print column-names (header) for DB results\n"); break;
-      case 'V': printf("  -V                     print column-values (rows) for DB results\n"); break;
-      case 's': printf("  -s                     generate tree-summary table (in top-level DB)\n"); break;
-      case 'b': printf("  -b                     build GUFI index tree\n"); break;
-      case 'a': printf("  -a                     AND/OR (SQL query combination)\n"); break;
-      case 'n': printf("  -n <threads>           number of threads\n"); break;
-      case 'd': printf("  -d <delim>             delimiter (one char)  [use 'x' for 0x%02X]\n", (uint8_t)fielddelim[0]); break;
-      case 'i': printf("  -i <input_dir>         input directory path\n"); break;
-      case 't': printf("  -t <to_dir>            build GUFI index (under) here\n"); break;
-      case 'o': printf("  -o <out_fname>         output file (one-per-thread, with thread-id suffix), implies -e 1\n"); break;
-      case 'O': printf("  -O <out_DB>            output DB, implies -e 1\n"); break;
-      case 'I': printf("  -I <SQL_init>          SQL init\n"); break;
-      case 'T': printf("  -T <SQL_tsum>          SQL for tree-summary table\n"); break;
-      case 'S': printf("  -S <SQL_sum>           SQL for summary table\n"); break;
-      case 'E': printf("  -E <SQL_ent>           SQL for entries table\n"); break;
-      case 'F': printf("  -F <SQL_fin>           SQL cleanup\n"); break;
-      case 'r': printf("  -r                     insert files and links into db (for bfwreaddirplus2db\n"); break;
-      case 'R': printf("  -R                     insert dires into db (for bfwreaddirplus2db\n"); break;
-      case 'D': printf("  -D                     dont descend the tree\n"); break;
-      case 'Y': printf("  -Y                     default to all directories suspect\n"); break;
-      case 'Z': printf("  -Z                     default to all files/links suspect\n"); break;
-      case 'W': printf("  -W <INSUSPECT>         suspect input file\n"); break;
-      case 'A': printf("  -A <suspectmethod>     suspect method (0 no suspects, 1 suspect file_dfl, 2 suspect stat d and file_fl, 3 suspect stat_dfl\n"); break;
-      case 'g': printf("  -g <stridesize>        stride size for striping inodes\n"); break;
-      case 'c': printf("  -c <suspecttime>       time in seconds since epoch for suspect comparision\n"); break;
-      case 'u': printf("  -u                     input mode is from a file so input is a file not a dir\n"); break;
-      case 'y': printf("  -y <min level>         minimum level to go down\n"); break;
-      case 'z': printf("  -z <max level>         maximum level to go down\n"); break;
-      case 'J': printf("  -J <SQL_interm>        SQL for intermediate results (no default: recommend using \"SELECT * FROM entries\")\n"); break;
-      case 'K': printf("  -K <create aggregate>  SQL to create the final aggregation table (if not specified, -I will be used)\n"); break;
-      case 'G': printf("  -G <SQL_aggregate>     SQL for aggregated results   (no default: recommend using \"SELECT * FROM entries\")\n"); break;
-      case 'e': printf("  -e <0 or 1>            0 for aggregate, 1 for print without aggregating (implied by -o and -O)\n"); break;
-      case 'm': printf("  -m                     Keep mtime and atime same on the database files\n"); break;
-      case 'B': printf("  -B <buffer size>       size of each thread's output buffer in bytes\n"); break;
-      case 'w': printf("  -w                     open the database files in read-write mode instead of read only mode\n"); break;
-      case 'f': printf("  -f <FORMAT>            use the specified FORMAT instead of the default; output a newline after each use of FORMAT\n"); break;
-      case 'j': printf("  -j                     print the information in terse form\n"); break;
-      case 'X': printf("  -X                     Dry run\n"); break;
-      case 'L': printf("  -L                     Highest number of files/links in a directory allowed to be rolled up\n"); break;
+      case 'h': printf("  -h                     help"); break;
+      case 'H': printf("  -H                     show assigned input values (debugging)"); break;
+      case 'x': printf("  -x                     enable xattr processing"); break;
+      case 'p': printf("  -p                     print file-names"); break;
+      case 'P': printf("  -P                     print directories as they are encountered"); break;
+      case 'N': printf("  -N                     print column-names (header) for DB results"); break;
+      case 'V': printf("  -V                     print column-values (rows) for DB results"); break;
+      case 's': printf("  -s                     generate tree-summary table (in top-level DB)"); break;
+      case 'b': printf("  -b                     build GUFI index tree"); break;
+      case 'a': printf("  -a                     AND/OR (SQL query combination)"); break;
+      case 'n': printf("  -n <threads>           number of threads"); break;
+      case 'd': printf("  -d <delim>             delimiter (one char)  [use 'x' for 0x%02X]", (uint8_t)fielddelim[0]); break;
+      case 'i': printf("  -i <input_dir>         input directory path"); break;
+      case 't': printf("  -t <to_dir>            build GUFI index (under) here"); break;
+      case 'o': printf("  -o <out_fname>         output file (one-per-thread, with thread-id suffix)"); break;
+      case 'O': printf("  -O <out_DB>            output DB"); break;
+      case 'I': printf("  -I <SQL_init>          SQL init"); break;
+      case 'T': printf("  -T <SQL_tsum>          SQL for tree-summary table"); break;
+      case 'S': printf("  -S <SQL_sum>           SQL for summary table"); break;
+      case 'E': printf("  -E <SQL_ent>           SQL for entries table"); break;
+      case 'F': printf("  -F <SQL_fin>           SQL cleanup"); break;
+      case 'r': printf("  -r                     insert files and links into db (for bfwreaddirplus2db"); break;
+      case 'R': printf("  -R                     insert dires into db (for bfwreaddirplus2db"); break;
+      case 'D': printf("  -D                     dont descend the tree"); break;
+      case 'Y': printf("  -Y                     default to all directories suspect"); break;
+      case 'Z': printf("  -Z                     default to all files/links suspect"); break;
+      case 'W': printf("  -W <INSUSPECT>         suspect input file"); break;
+      case 'A': printf("  -A <suspectmethod>     suspect method (0 no suspects, 1 suspect file_dfl, 2 suspect stat d and file_fl, 3 suspect stat_dfl"); break;
+      case 'g': printf("  -g <stridesize>        stride size for striping inodes"); break;
+      case 'c': printf("  -c <suspecttime>       time in seconds since epoch for suspect comparision"); break;
+      case 'u': printf("  -u                     input mode is from a file so input is a file not a dir"); break;
+      case 'y': printf("  -y <min level>         minimum level to go down"); break;
+      case 'z': printf("  -z <max level>         maximum level to go down"); break;
+      case 'J': printf("  -J <SQL_interm>        SQL for intermediate results"); break;
+      case 'K': printf("  -K <create aggregate>  SQL to create the final aggregation table"); break;
+      case 'G': printf("  -G <SQL_aggregate>     SQL for aggregated results"); break;
+break;
+      case 'm': printf("  -m                     Keep mtime and atime same on the database files"); break;
+      case 'B': printf("  -B <buffer size>       size of each thread's output buffer in bytes"); break;
+      case 'w': printf("  -w                     open the database files in read-write mode instead of read only mode"); break;
+      case 'f': printf("  -f <FORMAT>            use the specified FORMAT instead of the default; output a newline after each use of FORMAT"); break;
+      case 'j': printf("  -j                     print the information in terse form"); break;
+      case 'X': printf("  -X                     Dry run"); break;
+      case 'L': printf("  -L                     Highest number of files/links in a directory allowed to be rolled up"); break;
 
-      default: printf("print_help(): unrecognized option '%c'\n", (char)ch);
+      default: printf("print_help(): unrecognized option '%c'", (char)ch);
       }
+      printf("\n");
    }
    printf("\n");
 }
@@ -173,11 +174,11 @@ void show_input(struct input* in, int retval) {
    printf("in.xattr.enabled      = %d\n",    in->xattrs.enabled);
    printf("in.xattr.nobody.uid   = %d\n",    (int) in->xattrs.nobody.uid);
    printf("in.xattr.nobody.gid   = %d\n",    (int) in->xattrs.nobody.gid);
-   printf("in.sqlinit            = '%s'\n",  in->sqlinit);
-   printf("in.sqltsum            = '%s'\n",  in->sqltsum);
-   printf("in.sqlsum             = '%s'\n",  in->sqlsum);
-   printf("in.sqlent             = '%s'\n",  in->sqlent);
-   printf("in.sqlfin             = '%s'\n",  in->sqlfin);
+   printf("in.sql.init           = '%s'\n",  in->sql.init);
+   printf("in.sql.tsum           = '%s'\n",  in->sql.tsum);
+   printf("in.sql.sum            = '%s'\n",  in->sql.sum);
+   printf("in.sql.ent            = '%s'\n",  in->sql.ent);
+   printf("in.sql.fin            = '%s'\n",  in->sql.fin);
    printf("in.insertdir          = '%d'\n",  in->insertdir);
    printf("in.insertfl           = '%d'\n",  in->insertfl);
    printf("in.dontdescend        = '%d'\n",  in->dontdescend);
@@ -191,10 +192,9 @@ void show_input(struct input* in, int retval) {
    printf("in.infile             = '%d'\n",  in->infile);
    printf("in.min_level          = %zu\n",   in->min_level);
    printf("in.max_level          = %zu\n",   in->max_level);
-   printf("in.intermediate       = '%s'\n",  in->intermediate);
-   printf("in.create_aggregate   = '%s'\n",  in->create_aggregate);
-   printf("in.aggregate          = '%s'\n",  in->aggregate);
-   printf("in.show_results       = %d\n",    in->show_results);
+   printf("in.sql.intermediate   = '%s'\n",  in->sql.intermediate);
+   printf("in.sql.init_agg       = '%s'\n",  in->sql.init_agg);
+   printf("in.sql.agg            = '%s'\n",  in->sql.agg);
    printf("in.keep_matime        = %d\n",    in->keep_matime);
    printf("in.output_buffer_size = %zu\n",   in->output_buffer_size);
    printf("in.open_flags         = %d\n",    in->open_flags);
@@ -228,11 +228,6 @@ int parse_cmd_line(int         argc,
    in->maxthreads         = 1;                      // don't default to zero threads
    SNPRINTF(in->delim, sizeof(in->delim), "|");
    in->name_len           = 0;
-   in->sqlinit_len        = 0;
-   in->sqltsum_len        = 0;
-   in->sqlsum_len         = 0;
-   in->sqlent_len         = 0;
-   in->sqlfin_len         = 0;
    in->dontdescend        = 0;                      // default to descend
    in->buildinindir       = 0;                      // default to not building db in input dir
    in->suspectd           = 0;
@@ -247,6 +242,7 @@ int parse_cmd_line(int         argc,
    memset(in->outdbn,       0, MAXPATH);
    in->min_level          = 0;                      // default to the top
    in->max_level          = -1;                     // default to all the way down
+
    memset(&in->xattrs,          0, sizeof(in->xattrs));
    in->xattrs.nobody.uid  = 65534;
    in->xattrs.nobody.gid  = 65534;
@@ -255,13 +251,33 @@ int parse_cmd_line(int         argc,
        in->xattrs.nobody.uid = passwd->pw_uid;
        in->xattrs.nobody.gid = passwd->pw_gid;
    }
-   memset(in->sqltsum,          0, MAXSQL);
-   memset(in->sqlsum,           0, MAXSQL);
-   memset(in->sqlent,           0, MAXSQL);
-   memset(in->create_aggregate, 0, MAXSQL);
-   memset(in->intermediate,     0, MAXSQL);
-   memset(in->aggregate,        0, MAXSQL);
-   in->show_results       = PRINT;                  // print without aggregating by default
+
+   memset(in->sql.init,     0, MAXSQL);
+   in->sql.init_len       = 0;
+
+   memset(in->sql.fin,      0, MAXSQL);
+   in->sql.fin_len        = 0;
+
+   memset(in->sql.tsum,     0, MAXSQL);
+   in->sql.tsum_len       = 0;
+
+   memset(in->sql.sum,      0, MAXSQL);
+   in->sql.sum_len        = 0;
+
+   memset(in->sql.ent,      0, MAXSQL);
+   in->sql.ent_len        = 0;
+
+   memset(in->sql.intermediate, 0, MAXSQL);
+   in->sql.intermediate_len = 0;
+
+   memset(in->sql.init_agg, 0, MAXSQL);
+   in->sql.init_agg_len   = 0;
+
+   memset(in->sql.agg,      0, MAXSQL);
+   in->sql.agg_len        = 0;
+
+   in->output             = STDOUT;
+
    in->keep_matime        = 0;                      // default to not keeping mtime and atime
    in->output_buffer_size = 4096;
    in->open_flags         = SQLITE_OPEN_READONLY;   // default to read-only opens
@@ -337,14 +353,24 @@ int parse_cmd_line(int         argc,
          break;
 
       case 'o':
-         in->outfile = 1;
-         INSTALL_STR(in->outfilen, optarg, MAXPATH, "-o");
-         break;
+          /* TODO: Remove in->outfile */
+          in->outfile = 1;
+          INSTALL_STR(in->outfilen, optarg, MAXPATH, "-o");
+
+          in->output = OUTFILE;
+          INSTALL_STR(in->outname, optarg, MAXPATH, "-o");
+          in->outname_len = strlen(in->outname);
+          break;
 
       case 'O':
-         in->outdb = 1;
-         INSTALL_STR(in->outdbn, optarg, MAXPATH, "-O");
-         break;
+          /* TODO: Remove in->outdb */
+          in->outdb = 1;
+          INSTALL_STR(in->outdbn, optarg, MAXPATH, "-O");
+
+          in->output = OUTDB;
+          INSTALL_STR(in->outname, optarg, MAXPATH, "-O");
+          in->outname_len = strlen(in->outname);
+          break;
 
       case 't':
          INSTALL_STR(in->nameto, optarg, MAXPATH, "-t");
@@ -357,28 +383,28 @@ int parse_cmd_line(int         argc,
          break;
 
       case 'I':               // SQL initializations
-         INSTALL_STR(in->sqlinit, optarg, MAXSQL, "-I");
-         in->sqlinit_len = strlen(in->sqlinit);
+         INSTALL_STR(in->sql.init, optarg, MAXSQL, "-I");
+         in->sql.init_len = strlen(in->sql.init);
          break;
 
       case 'T':               // SQL for tree-summary
-         INSTALL_STR(in->sqltsum, optarg, MAXSQL, "-T");
-         in->sqltsum_len = strlen(in->sqltsum);
+         INSTALL_STR(in->sql.tsum, optarg, MAXSQL, "-T");
+         in->sql.tsum_len = strlen(in->sql.tsum);
          break;
 
       case 'S':               // SQL for summary
-         INSTALL_STR(in->sqlsum, optarg, MAXSQL, "-S");
-         in->sqlsum_len = strlen(in->sqlsum);
+         INSTALL_STR(in->sql.sum, optarg, MAXSQL, "-S");
+         in->sql.sum_len = strlen(in->sql.sum);
          break;
 
       case 'E':               // SQL for entries
-         INSTALL_STR(in->sqlent, optarg, MAXSQL, "-E");
-         in->sqlent_len = strlen(in->sqlent);
+         INSTALL_STR(in->sql.ent, optarg, MAXSQL, "-E");
+         in->sql.ent_len = strlen(in->sql.ent);
          break;
 
       case 'F':               // SQL clean-up
-         INSTALL_STR(in->sqlfin, optarg, MAXSQL, "-F");
-         in->sqlfin_len = strlen(in->sqlfin);
+         INSTALL_STR(in->sql.fin, optarg, MAXSQL, "-F");
+         in->sql.fin_len = strlen(in->sql.fin);
          break;
 
       case 'a':               // and/or
@@ -418,25 +444,6 @@ int parse_cmd_line(int         argc,
          INSTALL_INT(in->suspecttime, optarg, 1, 2147483646, "-c");
          break;
 
-      case 'e':
-         {
-            int show_results = 0;
-            INSTALL_INT(show_results, optarg, 0, 1, "-e");
-
-            switch (show_results) {
-                case 0:
-                    in->show_results = AGGREGATE;
-                    break;
-                case 1:
-                    in->show_results = PRINT;
-                    break;
-                default:
-                    retval = -1;
-                    break;
-            }
-         }
-         break;
-
       case 'y':
          INSTALL_UINT(in->min_level, optarg, (size_t) 0, (size_t) -1, "-y");
          break;
@@ -450,15 +457,18 @@ int parse_cmd_line(int         argc,
          break;
 
       case 'J':
-         INSTALL_STR(in->intermediate, optarg, MAXSQL, "-J");
+         INSTALL_STR(in->sql.intermediate, optarg, MAXSQL, "-J");
+         in->sql.intermediate_len = strlen(in->sql.intermediate);
          break;
 
       case 'K':
-         INSTALL_STR(in->create_aggregate, optarg, MAXSQL, "-K");
+         INSTALL_STR(in->sql.init_agg, optarg, MAXSQL, "-K");
+         in->sql.init_agg_len = strlen(in->sql.init_agg);
          break;
 
       case 'G':
-         INSTALL_STR(in->aggregate, optarg, MAXSQL, "-G");
+         INSTALL_STR(in->sql.agg, optarg, MAXSQL, "-G");
+         in->sql.agg_len = strlen(in->sql.agg);
          break;
 
       case 'm':
@@ -501,26 +511,6 @@ int parse_cmd_line(int         argc,
          retval = -1;
          fprintf(stderr, "?? getopt returned character code 0%o ??\n", ch);
       };
-   }
-
-   // -o and -O imply -e 1
-   if ((in->outfile || in->outdb) && (in->show_results == AGGREGATE)) {
-       fprintf(stderr, "Warning: An output prefix has been specified with aggregation. Turning off aggregation.\n");
-       in->show_results = PRINT;
-   }
-
-   // aggregating requires -S or -E, and 3 more SQL queries (-I, -J, and -G)
-   if (in->show_results == AGGREGATE) {
-       if (!in->sqlinit_len || (!in->sqlsum_len && !in->sqlent_len) || !strlen(in->aggregate) || !strlen(in->intermediate)) {
-           fprintf(stderr, "Missing SQL statements. Need: -I (init), -S (summary) or -E (entries), and -J (intermediate) and -G (aggregate)\n");
-           return retval = -1;
-       }
-   }
-
-   // only one output type is allowed
-   if (in->outfile && in->outdb) {
-       fprintf(stderr, "Cannot specify -o and -O at the same time\n");
-       return retval = -1;
    }
 
    // if there were no other errors,
