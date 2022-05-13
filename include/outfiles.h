@@ -67,10 +67,10 @@ OF SUCH DAMAGE.
 
 #include <stdio.h>
 
-/* opens an array of FILE *s; if openfiles == 0, uses stdout */
-FILE ** outfiles_init(FILE ** files, const int openfiles, char * prefix, const int count);
+/*opens an array of FILE *s; if openfiles == 0, uses stdout */
+FILE **outfiles_init(const int openfiles, char *prefix, const size_t count);
 
-/* closes the FILE *s */
-int outfiles_fin(FILE ** files, const int end);
+/*closes the FILE *s */
+int outfiles_fin(FILE **files, const size_t end);
 
 #endif
