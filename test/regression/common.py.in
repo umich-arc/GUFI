@@ -70,4 +70,4 @@ for _ in range(3):
     root = os.path.dirname(root)
 
 # test config file name
-config_path="config.test"
+config_path="@CMAKE_CURRENT_BINARY_DIR@/config.test"
